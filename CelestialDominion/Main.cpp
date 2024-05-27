@@ -10,6 +10,7 @@
 #include "Vector.h"
 #include "Projectile.h"
 #include "Mob.h"
+#include "Player.h"
 
 
 int main(int argc , char* argv[])
@@ -45,6 +46,11 @@ int main(int argc , char* argv[])
 	SDL_Texture* projectileTexture = SDL_CreateTextureFromSurface(renderer, projectileSurface);
 	SDL_FreeSurface(projectileSurface);
 
+	SDL_Surface* furySurface = SDL_LoadBMP("./images/fury.bmp");
+	SDL_SetColorKey(furySurface, SDL_TRUE, SDL_MapRGB(furySurface->format, 0, 0, 0));
+	SDL_Texture* furyTexture = SDL_CreateTextureFromSurface(renderer, furySurface);
+	SDL_FreeSurface(furySurface);
+
 	TTF_Init();
 
 	TTF_Font* Font = TTF_OpenFont("./fonts/Poppins-Medium.ttf",40);
@@ -76,13 +82,21 @@ int main(int argc , char* argv[])
 	ship.h = 100;
 
 	std::vector<Projectile> projectiles;
+	std::vector<Mob> mobs;
 	Vector mousePos;
 
 	bool appRunnig = true;
 	double angle = 0.0;
 	double projectileAngle = 0.0;
 
+	Player ply;
+
 	while (appRunnig) {
+
+		if (ply.health <= 0) {
+			appRunnig = false;
+		}
+
 		static Uint32 lastTime = SDL_GetTicks();
 		Uint32 currentTime = SDL_GetTicks();
 		float deltaTime = (currentTime - lastTime) / 1000.0f;
@@ -109,7 +123,19 @@ int main(int argc , char* argv[])
 					projectiles.push_back(newProjectile);
 				}
 				else if (event.button.button == SDL_BUTTON_RIGHT) {
-					SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION,"Feature unavailable","Feature is not available yet",window);
+					Mob newMob;
+					
+					newMob.x = getRandomX();
+					newMob.y = getRandomY();
+					
+					
+					newMob.id = "FURY";
+					newMob.w = 100;
+					newMob.h = 100;
+					newMob.angle = calculateAngle(ship.x + ship.w / 2, ship.y + ship.h / 2, newMob.x+newMob.w/2, newMob.y+newMob.h/2);
+					newMob.speed = 500;
+					newMob.active = true;
+					mobs.push_back(newMob);
 				}
 			}
 			if (event.type == SDL_MOUSEMOTION)
@@ -124,16 +150,53 @@ int main(int argc , char* argv[])
 
 		for (auto& projectile:projectiles) {
 			if (projectile.active) {
-				double adjustedAngle = projectile.angle;
 
-				float velX = projectile.speed * std::cos(adjustedAngle) * deltaTime;
-				float velY = projectile.speed * std::sin(adjustedAngle) * deltaTime;
+				float velX = projectile.speed * std::cos(projectile.angle) * deltaTime;
+				float velY = projectile.speed * std::sin(projectile.angle) * deltaTime;
 
 				projectile.x += static_cast<int>(velX);
 				projectile.y += static_cast<int>(velY);
 
 				if (projectile.x < 0 || projectile.x > SCREEN_WIDTH || projectile.y < 0 || projectile.y > SCREEN_HEIGHT) {
 					projectile.active = false;
+				}
+			}
+		}
+
+		for (auto& mob : mobs) {
+			if (mob.active) {
+
+				float velX = -mob.speed * std::cos(mob.angle) * deltaTime;
+				float velY = -mob.speed * std::sin(mob.angle) * deltaTime;
+
+				mob.x += static_cast<int>(velX);
+				mob.y += static_cast<int>(velY);
+
+				if (mob.x < ship.x + ship.w &&
+					mob.x + mob.w > ship.x &&
+					mob.y < ship.y + ship.h &&
+					mob.y + mob.h > ship.y) {
+					mob.active = false;
+					ply.health -= 25;
+					std::cout << ply.health << std::endl;
+				}
+
+			}
+		}
+
+		for (auto& projectile : projectiles) {
+			if (projectile.active) {
+				for (auto& mob : mobs) {
+					if (mob.active) {
+						if (mob.x < projectile.x + projectile.w &&
+							mob.x + mob.w > projectile.x &&
+							mob.y < projectile.y + projectile.h &&
+							mob.y + mob.h > projectile.y) {
+							mob.active = false;
+							projectile.active = false;
+							ply.score += 5;
+						}
+					}
 				}
 			}
 		}
@@ -149,12 +212,25 @@ int main(int argc , char* argv[])
 			if (projectile.active) {
 				SDL_Rect projectileRect = { static_cast<int>(projectile.x), static_cast<int>(projectile.y), 50, 50 };
 				SDL_RenderCopyEx(renderer, projectileTexture, nullptr, &projectileRect, projectile.angle* (180.0 / M_PI) + 90.0, NULL, SDL_FLIP_NONE);
+				// SDL_RenderDrawRect(renderer,&projectileRect);
+			}
+		}
+
+		for (const auto& mob : mobs) {
+			if (mob.active) {
+				SDL_Rect mobRect = { static_cast<int>(mob.x), static_cast<int>(mob.y), 100, 100 };
+				SDL_RenderCopyEx(renderer, furyTexture, nullptr, &mobRect, mob.angle * (180.0 / M_PI)-90, NULL, SDL_FLIP_NONE);
+				// SDL_RenderDrawRect(renderer, &mobRect);
 			}
 		}
 		
 		SDL_RenderCopyEx(renderer, shipTexture, NULL, &ship, (angle * (180 / M_PI)) + 90.0, NULL, SDL_FLIP_NONE);
+		// SDL_RenderDrawRect(renderer, &ship);
 		SDL_RenderPresent(renderer);
+		ply.score +=(int) deltaTime;
 	}
+	std::string msg = "Score :" + std::to_string(ply.score);
+	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION , "Game Over" , msg.c_str(),window );
 
 	SDL_DestroyWindow(window);
 	SDL_DestroyRenderer(renderer);
@@ -162,6 +238,7 @@ int main(int argc , char* argv[])
 	SDL_DestroyTexture(projectileTexture);
 	SDL_DestroyTexture(backgroundTexture);
 	SDL_DestroyTexture(shipTexture);
+	SDL_DestroyTexture(furyTexture);
 	TTF_CloseFont(Font);
 	TTF_Quit();
 	SDL_Quit();

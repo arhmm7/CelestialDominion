@@ -1,24 +1,17 @@
 #pragma once
 #include <iostream>
+#include <stdlib.h>
 
 #include "Projectile.h"
-#include <stdlib.h>
 
 class Mob
 {
-	int lbx = 1280, ubx = 1700;
-	int lby = 720, uby = 1200;
-
 public:
-	
-
-	Mob() {
-		std::cout << "Mob Spawned" << std::endl;
-	}
-	~Mob() {
-		std::cout << "Mob Deleted" << std::endl;
-	}
-
-
+	const char* id;
+	int health;
+	int speed;
+	double angle;
+	int x = 0,y = 0,w = 0,h = 0;
+	bool active;
 };
 
