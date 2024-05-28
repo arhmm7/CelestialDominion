@@ -11,6 +11,7 @@ struct Projectile
 	int h;
 	int x;
 	int y;
+	int damage;
 	int speed;
 	double angle;
 	bool active;
